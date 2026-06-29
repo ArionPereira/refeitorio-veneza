@@ -2,7 +2,7 @@ import React from "react";
 const { useState, useEffect, useMemo, useRef } = React;
 
 import { C, clientId, novoId, estaEditando, fmtHora, brl } from "./constants.js";
-import { hojeISO, addDias, fmtData, iso, fromISO } from "./dates.js";
+import { hojeISO, addDias, fmtData, iso, fromISO, intervalo } from "./dates.js";
 import { sb, CHAVE } from "./db.js";
 import {
   INSUMOS_SEED, PRATOS_SEED, TIPOS_SEED, PREVISTO_PADRAO,
@@ -138,6 +138,34 @@ export function App() {
   const custoPrato       = (p) => !p?0:p.ficha.reduce((s,l)=>s+custoLinha(l),0);
   const custoPratosLista = (ids) => (ids||[]).reduce((s,id)=>s+custoPrato(pratoMap[id]),0);
 
+  // consumo de uma refeição em unidades-base (kg/L/un), já com FC
+  const consumoLinha = (l, qtdRef) => { const i=insumoMap[l.insumoId]; if(!i)return 0; const base = i.unidade==="un" ? (Number(l.g)||0) : ((Number(l.g)||0)/1000)*i.fc; return base*qtdRef; };
+
+  // baixa de estoque: desconta o consumo das refeições do período (realizado, ou previsto se vazio)
+  // e marca cada refeição como "baixado" para nunca descontar duas vezes.
+  const darBaixaConsumo = (deISO, ateISO) => {
+    const datas = intervalo(deISO, ateISO);
+    const consumo = {}; const novoCardapio = {...cardapio}; let nMeals = 0;
+    datas.forEach(d=>{
+      const dia = cardapio[d]; if(!dia) return;
+      const ndia = {...dia}; let changed = false;
+      Object.keys(dia).forEach(rid=>{
+        const m = dia[rid];
+        if (m.baixado || !m.pratos || !m.pratos.length) return;
+        const qtdRef = (m.realizado!=null ? m.realizado : m.previsto) || 0;
+        if (qtdRef<=0) return;
+        m.pratos.forEach(id=>{ const p=pratoMap[id]; if(!p)return; p.ficha.forEach(l=>{ consumo[l.insumoId]=(consumo[l.insumoId]||0)+consumoLinha(l,qtdRef); }); });
+        ndia[rid] = {...m, baixado:true}; changed=true; nMeals++;
+      });
+      if (changed) novoCardapio[d] = ndia;
+    });
+    if (nMeals===0) return 0;
+    const novoEstoque = {...estoque};
+    Object.keys(consumo).forEach(id=>{ novoEstoque[id]=Math.max(0,(Number(novoEstoque[id])||0)-consumo[id]); });
+    setCardapio(novoCardapio); setEstoque(novoEstoque); agendarSave();
+    return nMeals;
+  };
+
   if (precisaNome) return <ModalNome onOk={(v)=>{ localStorage.setItem("refeitorio_nome",v); setNome(v); setPrecisaNome(false); }}/>;
   if (loading) return <Centro txt="Carregando do banco…"/>;
 
@@ -150,7 +178,7 @@ export function App() {
       <main style={{maxWidth:1080,margin:"0 auto",padding:"0 20px"}}>
         {tab==="cardapio"  && <Calendario {...{cardapio,pratos,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,addPratoMeal,removePratoMeal,ativarRefDia,removerRefDia,setPrevisto,setRealizado,copiarDia,copiarDiaIntervalo,limparDia,copiarSemana,recalcularDia,segDe}}/>}
         {tab==="custos"    && <Custos     {...{insumos,insumoMap,pratos,custoLinha,custoPrato,updateInsumo,addInsumo,removeInsumo,ceasa,setCeasa,updatePrato,addPrato,removePrato,addLinha,updateLinha,removeLinha}}/>}
-        {tab==="operacao"  && <Operacao   {...{cardapio,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,insumos,insumoMap,estoque,setEstoqueItem}}/>}
+        {tab==="operacao"  && <Operacao   {...{cardapio,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,insumos,insumoMap,estoque,setEstoqueItem,consumoLinha,darBaixaConsumo}}/>}
         {tab==="relatorio" && <Relatorio  {...{cardapio,pratoMap,custoPratosLista,tiposRefeicao}}/>}
         {tab==="mural"     && <Mural      {...{cardapio,pratoMap,tiposRefeicao}}/>}
       </main>

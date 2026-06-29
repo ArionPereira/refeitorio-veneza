@@ -4,10 +4,13 @@ import { C, SH, CATEGORIAS, brl, num } from "../constants.js";
 import { hojeISO, addDias, fmtData, intervalo } from "../dates.js";
 import { SectionTitle } from "../ui.jsx";
 
-export function Operacao({cardapio, pratoMap, custoPrato, custoPratosLista, tiposRefeicao, insumos, insumoMap, estoque, setEstoqueItem}) {
+export function Operacao({cardapio, pratoMap, custoPrato, custoPratosLista, tiposRefeicao, insumos, insumoMap, estoque, setEstoqueItem, consumoLinha, darBaixaConsumo}) {
   const [de,          setDe]          = useState(hojeISO());
   const [ate,         setAte]         = useState(addDias(hojeISO(),6));
   const [showEstoque, setShowEstoque] = useState(false);
+  const [showBaixa,   setShowBaixa]   = useState(false);
+  const [baixaDe,     setBaixaDe]     = useState(addDias(hojeISO(),-6));
+  const [baixaAte,    setBaixaAte]    = useState(hojeISO());
 
   const inp  = {border:"1px solid "+C.line,borderRadius:8,padding:"7px 9px",fontSize:14,background:C.paper,color:C.ink};
   const inp2 = {border:"1px solid "+C.line,borderRadius:6,padding:"6px 8px",fontSize:14,background:C.paper,color:C.ink};
@@ -128,6 +131,76 @@ export function Operacao({cardapio, pratoMap, custoPrato, custoPratosLista, tipo
             ⚠ {abaixo.length} {abaixo.length===1?"item abaixo":"itens abaixo"} do mínimo: {abaixo.map(i=>i.nome).join(", ")}
           </div>
         : null;
+    })()}
+
+    <div style={{borderTop:"1px solid "+C.line,marginTop:18,paddingTop:14}}>
+      <button onClick={()=>setShowBaixa(s=>!s)}
+        style={{background:"transparent",border:"none",cursor:"pointer",fontSize:18,fontWeight:600,color:C.brand,display:"flex",alignItems:"center",gap:6,padding:0,fontFamily:"Georgia,'Times New Roman',serif"}}>
+        {showBaixa?"▾":"▸"} Dar baixa de consumo no estoque
+      </button>
+    </div>
+
+    {showBaixa && (()=>{
+      const datasB = intervalo(baixaDe, baixaAte);
+      const consumo = {}; let nMeals=0, nJa=0, nReal=0, nPrev=0;
+      datasB.forEach(d=>{
+        const dia = cardapio[d]||{};
+        Object.keys(dia).forEach(rid=>{
+          const m = dia[rid]; if(!m.pratos||!m.pratos.length) return;
+          if (m.baixado) { nJa++; return; }
+          const qtdRef = (m.realizado!=null ? m.realizado : m.previsto)||0; if(qtdRef<=0) return;
+          nMeals++; if(m.realizado!=null) nReal++; else nPrev++;
+          m.pratos.forEach(id=>{ const p=pratoMap[id]; if(!p)return; p.ficha.forEach(l=>{ consumo[l.insumoId]=(consumo[l.insumoId]||0)+consumoLinha(l,qtdRef); }); });
+        });
+      });
+      const linhasB = Object.keys(consumo).map(id=>{ const i=insumoMap[id]; return {id,nome:i?i.nome:id,unidade:i?i.unidade:"kg",qtd:consumo[id],est:Number((estoque||{})[id])||0}; }).sort((a,b)=>b.qtd-a.qtd);
+      const fmtQ = (q,u) => (u==="un"?Math.round(q):q.toFixed(2))+" "+u;
+      const fazer = () => {
+        if(!nMeals) return;
+        const ok = window.confirm("Dar baixa do consumo de "+nMeals+" refeicao(oes) ("+fmtData(baixaDe)+"–"+fmtData(baixaAte)+") no estoque?\n\nDesconta os ingredientes consumidos e marca as refeicoes como baixadas (nao desconta de novo).");
+        if(!ok) return;
+        darBaixaConsumo(baixaDe, baixaAte);
+      };
+      return (<>
+        <p style={{fontSize:13,color:C.muted,marginTop:8}}>
+          Desconta do estoque o que foi consumido nas refeições do período. Usa o <b>realizado</b> lançado; se não houver, usa o <b>previsto</b>. Cada refeição é marcada como baixada — não desconta duas vezes. Para repor, registre a compra aumentando o estoque do item.
+        </p>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end",marginTop:8}}>
+          <div><div style={{fontSize:12,color:C.muted,marginBottom:4}}>De</div><input type="date" value={baixaDe} onChange={e=>setBaixaDe(e.target.value)} style={inp}/></div>
+          <div><div style={{fontSize:12,color:C.muted,marginBottom:4}}>Até</div><input type="date" value={baixaAte} onChange={e=>setBaixaAte(e.target.value)} style={inp}/></div>
+        </div>
+        <p style={{fontSize:13,color:C.muted,marginTop:10}}>
+          <b style={{color:C.ink}}>{nMeals}</b> refeição(ões) prontas para baixa{nMeals>0 && <span> ({nReal} com realizado{nPrev>0?", "+nPrev+" usando previsto":""})</span>} · {nJa} já baixada(s) no período.
+        </p>
+        {nMeals>0 ? (<>
+          <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,overflow:"hidden",boxShadow:SH,overflowX:"auto",marginTop:4}}>
+            <table style={{width:"100%",minWidth:460}}>
+              <thead><tr style={{background:C.sage}}>
+                <th style={{...cell,textAlign:"left",fontWeight:700}}>Insumo</th>
+                <th style={{...cell,textAlign:"right",fontWeight:700}}>Consumo</th>
+                <th style={{...cell,textAlign:"right",fontWeight:700}}>Estoque atual</th>
+                <th style={{...cell,textAlign:"right",fontWeight:700}}>Após baixa</th>
+              </tr></thead>
+              <tbody>
+                {linhasB.map(l=>{ const apos=Math.max(0,l.est-l.qtd); const falta=l.qtd>l.est; return (
+                  <tr key={l.id}>
+                    <td style={cell}>{l.nome}</td>
+                    <td style={{...cell,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>−{fmtQ(l.qtd,l.unidade)}</td>
+                    <td style={{...cell,textAlign:"right",fontVariantNumeric:"tabular-nums",color:C.muted}}>{fmtQ(l.est,l.unidade)}</td>
+                    <td style={{...cell,textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:700,color:falta?C.clay:C.ink}}>{fmtQ(apos,l.unidade)}{falta && <span title="Estoque insuficiente — vai zerar" style={{marginLeft:4}}>⚠</span>}</td>
+                  </tr>
+                ); })}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={fazer}
+            style={{marginTop:14,background:C.brand,color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+            Dar baixa ({nMeals} refeições)
+          </button>
+        </>) : (
+          <p style={{fontSize:13,color:C.muted,marginTop:4}}>Nada para baixar neste período. Lance o <b>realizado</b> no Calendário ou ajuste as datas.</p>
+        )}
+      </>);
     })()}
 
     <div style={{borderTop:"1px solid "+C.line,marginTop:18,paddingTop:14}}>

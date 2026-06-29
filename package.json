@@ -5,7 +5,8 @@
   "type": "module",
   "description": "App de cardápio/refeitório da Sementes Veneza (React + Supabase, single-file PWA)",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "deploy": "node deploy.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
