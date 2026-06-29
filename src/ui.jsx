@@ -63,7 +63,7 @@ export function Header({tab, setTab, onSair}) {
     <header style={{background:"rgba(255,255,255,.9)",backdropFilter:"saturate(180%) blur(8px)",WebkitBackdropFilter:"saturate(180%) blur(8px)",borderBottom:"1px solid "+C.line,boxShadow:SH,marginBottom:28,position:"sticky",top:0,zIndex:50}}>
       <div style={{maxWidth:1080,margin:"0 auto",padding:"0 20px"}}>
         <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",padding:"12px 0 10px"}}>
-          {logo && <img src={logo} alt="Sementes Veneza" style={{height:46,width:"auto"}}/>}
+          {logo && <img src={logo} alt="Sementes Veneza" style={{height:62,width:"auto"}}/>}
           <div style={{borderLeft:"1px solid "+C.line,paddingLeft:14}}>
             <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.accent,fontWeight:700}}>Refeitório · UBS</div>
             <h1 style={{fontFamily:SERIF,fontSize:21,margin:"1px 0 0",fontWeight:600,color:C.brand,letterSpacing:-0.3}}>Cardápio do refeitório</h1>

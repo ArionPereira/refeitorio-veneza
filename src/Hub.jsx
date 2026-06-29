@@ -67,7 +67,7 @@ export function Hub({ onSelect, nome }) {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header style={{ background: "rgba(255,255,255,.9)", backdropFilter: "saturate(180%) blur(8px)", WebkitBackdropFilter: "saturate(180%) blur(8px)", borderBottom: "1px solid " + C.line, boxShadow: SH }}>
         <div style={{ maxWidth: 1080, margin: "0 auto", padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          {logo && <img src={logo} alt="Sementes Veneza" style={{ height: 48, width: "auto" }} />}
+          {logo && <img src={logo} alt="Sementes Veneza" style={{ height: 80, width: "auto" }} />}
           <div style={{ borderLeft: "1px solid " + C.line, paddingLeft: 14 }}>
             <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: C.accent, fontWeight: 700 }}>Sementes Veneza</div>
             <h1 style={{ fontFamily: SERIF, fontSize: 21, margin: "1px 0 0", fontWeight: 600, color: C.brand, letterSpacing: -0.3 }}>Central de aplicativos</h1>
