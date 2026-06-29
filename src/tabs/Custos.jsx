@@ -8,14 +8,14 @@ import { PrecoCeasaCell, AtualizarCeasa, RefCarnes, ConsultaCeasa } from "../cea
 // FichaCard
 // ---------------------------------------------------------------------------
 
-function FichaCard({prato, insumos, insumoMap, custoLinha, custoPrato, inp, updatePrato, removePrato, addLinha, updateLinha, removeLinha}) {
+function FichaCard({prato, insumos, insumoMap, custoLinha, custoPrato, inp, hiName, updatePrato, removePrato, addLinha, updateLinha, removeLinha}) {
   const [open, setOpen] = useState(false);
   const total = custoPrato(prato);
   return (
     <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,overflow:"hidden",boxShadow:SH}}>
       <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:C.sage,borderBottom:open?"1px solid "+C.line:"none",flexWrap:"wrap"}}>
         <button onClick={()=>setOpen(o=>!o)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:14,color:C.brand,width:18}}>{open?"▾":"▸"}</button>
-        <input value={prato.nome} onChange={e=>updatePrato(prato.id,"nome",e.target.value)} style={{...inp,flex:"2 1 160px",fontWeight:600}}/>
+        <input value={prato.nome} onChange={e=>updatePrato(prato.id,"nome",e.target.value)} style={{...inp,flex:"2 1 160px",fontWeight:600,...hiName}}/>
         <select value={prato.categoria} onChange={e=>updatePrato(prato.id,"categoria",e.target.value)} style={{...inp,flex:"1 1 120px"}}>
           {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
         </select>
@@ -80,6 +80,7 @@ export function Custos({insumos, insumoMap, pratos, custoLinha, custoPrato, upda
   const buscaInp= {...inp,flex:"1 1 200px",maxWidth:300,padding:"9px 11px"};
 
   const q = normBusca(busca);
+  const hiName = q ? {background:"#FFF7DA"} : null;
   const insumosFiltrados = q ? insumos.filter(i=>normBusca(i.nome).includes(q)) : insumos;
   const pratosFiltrados  = q ? pratos.filter(p=>normBusca(p.nome).includes(q)) : pratos;
 
@@ -100,7 +101,7 @@ export function Custos({insumos, insumoMap, pratos, custoLinha, custoPrato, upda
         <button onClick={addInsumo} style={addBtn}>+ Adicionar insumo</button>
         <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar insumo…" style={buscaInp}/>
       </div>
-      <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,overflow:"hidden",boxShadow:SH,overflowX:"auto",marginTop:12}}>
+      <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,overflow:"hidden",boxShadow:SH,overflowX:"auto",WebkitOverflowScrolling:"touch",marginTop:12}}>
         <table style={{width:"100%",minWidth:420}}>
           <thead><tr style={{background:C.sage}}>
             <th style={{...cell,textAlign:"left",fontWeight:700}}>Insumo</th>
@@ -113,7 +114,7 @@ export function Custos({insumos, insumoMap, pratos, custoLinha, custoPrato, upda
           <tbody>
             {insumosFiltrados.map(i=>(
               <tr key={i.id}>
-                <td style={cell}><input value={i.nome} onChange={e=>updateInsumo(i.id,"nome",e.target.value)} style={{...inp,width:"100%"}}/></td>
+                <td style={cell}><input value={i.nome} onChange={e=>updateInsumo(i.id,"nome",e.target.value)} style={{...inp,width:"100%",...hiName}}/></td>
                 <td style={{...cell,textAlign:"center"}}>
                   <select value={i.unidade} onChange={e=>updateInsumo(i.id,"unidade",e.target.value)} style={{...inp,width:64}}>
                     <option value="kg">kg</option>
@@ -154,7 +155,7 @@ export function Custos({insumos, insumoMap, pratos, custoLinha, custoPrato, upda
       <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
         {pratosFiltrados.map(p=>(
           <FichaCard key={p.id} prato={p} insumos={insumos} insumoMap={insumoMap}
-            custoLinha={custoLinha} custoPrato={custoPrato} inp={inp}
+            custoLinha={custoLinha} custoPrato={custoPrato} inp={inp} hiName={hiName}
             updatePrato={updatePrato} removePrato={removePrato}
             addLinha={addLinha} updateLinha={updateLinha} removeLinha={removeLinha}/>
         ))}

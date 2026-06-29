@@ -31,6 +31,15 @@ const CSS = `
   ::-webkit-scrollbar-thumb{background:#C7D2DE;border-radius:8px;border:3px solid transparent;background-clip:content-box}
   ::-webkit-scrollbar-thumb:hover{background:#AEBDCC;background-clip:content-box}
   ::-webkit-scrollbar-track{background:transparent}
+  @media (max-width:640px){
+    main{padding-left:12px!important;padding-right:12px!important}
+  }
+  @media print{
+    .no-print{display:none!important}
+    body{background:#fff!important}
+    main{padding:0!important;max-width:100%!important}
+    @page{margin:12mm}
+  }
 `;
 
 // 1) bundla o entry.jsx em memória

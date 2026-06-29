@@ -2,6 +2,7 @@ import React from "react";
 import * as pdfjsLib from "pdfjs-dist/build/pdf.min.mjs";
 const { useState, useRef } = React;
 import { C, SH, SH2, brl } from "./constants.js";
+import { realce } from "./ui.jsx";
 
 try {
   const __wb = (typeof window !== "undefined" && window.location && window.location.href) ? window.location.href : "";
@@ -307,6 +308,7 @@ export function ConsultaCeasa({ceasa}) {
   const [q, setQ] = useState("");
   const itens = ceasa&&ceasa.itens ? ceasa.itens : null;
   const lista  = itens ? itens.filter(it=>!q||normNome(it.nome).includes(normNome(q))).slice().sort((a,b)=>a.nome.localeCompare(b.nome)) : [];
+  const qReal = q.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
   const inp  = {border:"1px solid "+C.line,borderRadius:8,padding:"8px 11px",fontSize:14,background:C.paper,color:C.ink};
   const cell = {padding:"7px 11px",borderBottom:"1px solid "+C.line,fontSize:13.5};
   return (<>
@@ -316,7 +318,7 @@ export function ConsultaCeasa({ceasa}) {
           <p style={{fontSize:13,color:C.muted,marginTop:-6}}>Cotação <b>{ceasa.arquivo||"carregada"}</b> · {itens.length} produtos. Preço por quilo (coluna oficial do CEASA). Só consulta — não altera nada.</p>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar produto (ex.: tomate, banana, ovo)…"
             style={{...inp,width:"100%",maxWidth:360,marginBottom:12}}/>
-          <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,boxShadow:SH,overflow:"hidden",overflowX:"auto"}}>
+          <div style={{background:C.card,border:"1px solid "+C.line,borderRadius:12,boxShadow:SH,overflow:"hidden",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
             <table style={{width:"100%",minWidth:360}}>
               <thead><tr style={{background:C.sage}}>
                 <th style={{...cell,textAlign:"left",fontWeight:700}}>Produto</th>
@@ -326,7 +328,7 @@ export function ConsultaCeasa({ceasa}) {
               <tbody>
                 {lista.map((it,k)=>(
                   <tr key={k}>
-                    <td style={{...cell,textAlign:"left"}}>{it.nome}</td>
+                    <td style={{...cell,textAlign:"left"}}>{realce(it.nome, qReal)}</td>
                     <td style={{...cell,textAlign:"center",color:C.muted}}>{it.emb||"—"}</td>
                     <td style={{...cell,textAlign:"right",fontWeight:700,color:C.brand,fontVariantNumeric:"tabular-nums"}}>{brl(it.precokg)}</td>
                   </tr>
