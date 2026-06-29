@@ -36,7 +36,7 @@ function FichaCard({prato, insumos, insumoMap, custoLinha, custoPrato, inp, upda
               <th style={{width:30}}></th>
             </tr></thead>
             <tbody>
-              {prato.ficha.map((l,idx)=>{ const ins = insumoMap[l.insumoId]; const un = ins?.unidade; const lbl = un==="L"?"ml" : un==="un"?"un" : "g cru"; const step = un==="un"?1:5; return (
+              {prato.ficha.map((l,idx)=>{ const ins = insumoMap[l.insumoId]; const un = ins?.unidade; const lbl = un==="L"?"ml" : un==="un"?"un" : "g"; const step = un==="un"?1:5; return (
                 <tr key={idx}>
                   <td style={{padding:"3px 6px"}}>
                     <select value={l.insumoId} onChange={e=>updateLinha(prato.id,idx,"insumoId",e.target.value)} style={{...inp,width:"100%"}}>
@@ -142,7 +142,7 @@ export function Custos({insumos, insumoMap, pratos, custoLinha, custoPrato, upda
 
     {view==="fichas" && (<>
       <SectionTitle>Fichas técnicas</SectionTitle>
-      <p style={{fontSize:13,color:C.muted,marginTop:-6}}>Quantidade por pessoa: <b>g cru</b> para insumos em kg · <b>ml</b> para líquidos (L) · <b>un</b> para unitários. Custo = (g ou ml ÷ 1000) × FC × preço/kg-L, ou qtd × preço/un.</p>
+      <p style={{fontSize:13,color:C.muted,marginTop:-6}}>Quantidade por pessoa: <b>g</b> para insumos em kg · <b>ml</b> para líquidos (L) · <b>un</b> para unitários. Custo = (g ou ml ÷ 1000) × FC × preço/kg-L, ou qtd × preço/un.</p>
       <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
         {pratos.map(p=>(
           <FichaCard key={p.id} prato={p} insumos={insumos} insumoMap={insumoMap}
