@@ -116,7 +116,7 @@ export function Restaurante({ nome, onSair }) {
   // ---- pratos + fichas ----
   const updatePrato = (id,campo,val) => { setPratos(ps=>ps.map(p=>p.id===id?{...p,[campo]:val}:p)); agendarSave(); };
   const removePrato = (id) => { setPratos(ps=>ps.filter(p=>p.id!==id)); setCardapio(c=>{ const nc={}; Object.keys(c).forEach(d=>{ const dia={}; Object.keys(c[d]).forEach(rid=>{ const r=c[d][rid]; dia[rid]={...r,pratos:(r.pratos||[]).filter(x=>x!==id)}; }); nc[d]=dia; }); return nc; }); agendarSave(); };
-  const addPrato    = () => { setPratos(ps=>[...ps,{id:novoId(),nome:"Novo prato",categoria:"Prato principal",sazonal:false,ficha:[]}]); agendarSave(); };
+  const addPrato    = () => { setPratos(ps=>[...ps,{id:novoId(),nome:"Novo prato",categoria:"Prato principal",ficha:[]}]); agendarSave(); };
   const addLinha    = (pid) => { setPratos(ps=>ps.map(p=>p.id===pid?{...p,ficha:[...p.ficha,{insumoId:(insumos[0]&&insumos[0].id)||"",g:0}]}:p)); agendarSave(); };
   const updateLinha = (pid,idx,campo,val) => { setPratos(ps=>ps.map(p=>p.id===pid?{...p,ficha:p.ficha.map((l,i)=>i===idx?{...l,[campo]:val}:l)}:p)); agendarSave(); };
   const removeLinha = (pid,idx) => { setPratos(ps=>ps.map(p=>p.id===pid?{...p,ficha:p.ficha.filter((_,i)=>i!==idx)}:p)); agendarSave(); };
@@ -124,6 +124,7 @@ export function Restaurante({ nome, onSair }) {
   // ---- dia (por data) ----
   const copiarDia         = (origem,destino,tipos) => { if(!origem||!destino)return; setCardapio(c=>{ const src=c[origem]; if(!src)return c; const destDia={...(c[destino]||{})}; Object.keys(src).forEach(rid=>{ if(tipos&&tipos.length&&!tipos.includes(rid))return; destDia[rid]={pratos:(src[rid].pratos||[]).slice(),previsto:src[rid].previsto,realizado:null,custoCong:null}; }); return {...c,[destino]:destDia}; }); agendarSave(); };
   const limparDia         = (data) => { setCardapio(c=>{ const n={...c}; delete n[data]; return n; }); agendarSave(); };
+  const limparDias        = (datas) => { if(!datas||!datas.length)return; setCardapio(c=>{ const n={...c}; datas.forEach(d=>delete n[d]); return n; }); agendarSave(); };
   const recalcularDia     = (data) => { setCardapio(c=>{ const dia={...(c[data]||{})}; Object.keys(dia).forEach(rid=>{ const r=dia[rid]; if(r.realizado!=null) dia[rid]={...r,custoCong:custoPratosLista(r.pratos)}; }); return {...c,[data]:dia}; }); agendarSave(); };
   const segDe             = (dataISO) => { const d=fromISO(dataISO); const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); return iso(d); };
   const copiarSemana      = (origemISO,destinoISO,tipos) => { if(!origemISO||!destinoISO)return; const os=segDe(origemISO),ds=segDe(destinoISO); setCardapio(c=>{ const nc={...c}; for(let i=0;i<7;i++){ const od=addDias(os,i),dd=addDias(ds,i); const src=c[od]; if(!src)continue; const destDia={...(nc[dd]||{})}; Object.keys(src).forEach(rid=>{ if(tipos&&tipos.length&&!tipos.includes(rid))return; destDia[rid]={pratos:(src[rid].pratos||[]).slice(),previsto:src[rid].previsto,realizado:null,custoCong:null}; }); nc[dd]=destDia; } return nc; }); agendarSave(); };
@@ -146,7 +147,7 @@ export function Restaurante({ nome, onSair }) {
       <Header tab={tab} setTab={setTab} onSair={onSair}/>
       {erro && <div style={{maxWidth:1080,margin:"0 auto 12px",padding:"10px 14px",background:"#FBEAE3",border:"1px solid "+C.clay,borderRadius:10,color:C.clay,fontSize:13}}>Erro: {erro}</div>}
       <main style={{maxWidth:1080,margin:"0 auto",padding:"0 20px"}}>
-        {tab==="cardapio"  && <Calendario {...{cardapio,pratos,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,addPratoMeal,removePratoMeal,ativarRefDia,removerRefDia,setPrevisto,setRealizado,copiarDia,copiarDiaIntervalo,limparDia,copiarSemana,recalcularDia,segDe}}/>}
+        {tab==="cardapio"  && <Calendario {...{cardapio,pratos,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,addPratoMeal,removePratoMeal,ativarRefDia,removerRefDia,setPrevisto,setRealizado,copiarDia,copiarDiaIntervalo,limparDia,limparDias,copiarSemana,recalcularDia,segDe}}/>}
         {tab==="custos"    && <Custos     {...{insumos,insumoMap,pratos,custoLinha,custoPrato,updateInsumo,addInsumo,removeInsumo,ceasa,setCeasa,updatePrato,addPrato,removePrato,addLinha,updateLinha,removeLinha}}/>}
         {tab==="operacao"  && <Operacao   {...{cardapio,pratoMap,custoPrato,custoPratosLista,tiposRefeicao,insumos,insumoMap,estoque,setEstoqueItem}}/>}
         {tab==="relatorio" && <Relatorio  {...{cardapio,pratoMap,custoPratosLista,tiposRefeicao}}/>}
