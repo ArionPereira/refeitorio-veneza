@@ -11,6 +11,11 @@ async function ok(promise) {
   return data;
 }
 
+// ---- Usuários ----
+export const listUsuarios  = ()        => ok(sb.from("pcm_usuarios").select("*").order("nome"));
+export const addUsuario    = (obj)      => ok(sb.from("pcm_usuarios").insert(obj).select().single());
+export const updateUsuario = (id, patch)=> ok(sb.from("pcm_usuarios").update(patch).eq("id", id).select().single());
+
 // ---- Setores ----
 export const listSetores  = ()        => ok(sb.from("pcm_setores").select("*").order("ordem"));
 export const addSetor     = (nome, ordem=0) => ok(sb.from("pcm_setores").insert({ nome, ordem }).select().single());
@@ -60,7 +65,7 @@ export async function uploadFoto(file, prefixo="os") {
 // ---- Realtime: avisa quando qualquer tabela pcm_ muda ----
 export function assinarPCM(onChange) {
   const ch = sb.channel("pcm-realtime");
-  ["pcm_setores","pcm_equipamentos","pcm_ordens","pcm_os_fotos"].forEach(t=>{
+  ["pcm_usuarios","pcm_setores","pcm_equipamentos","pcm_ordens","pcm_os_fotos"].forEach(t=>{
     ch.on("postgres_changes", { event:"*", schema:"public", table:t }, (payload)=>onChange(t, payload));
   });
   ch.subscribe();

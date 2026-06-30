@@ -76,7 +76,8 @@ export function BarraPresenca({online, nome, ultimoSave, status, pendente, onSyn
 }
 
 export function Header({tab, setTab, onSair, titulo="Restaurante", eyebrow="Sementes Veneza · Refeitório",
-  tabs=[["cardapio","Calendário"],["custos","Fichas & custos"],["operacao","Operação"],["painel","Painel"],["relatorio","Relatório"],["mural","Mural"]]}) {
+  tabs=[["cardapio","Calendário"],["custos","Fichas & custos"],["operacao","Operação"],["painel","Painel"],["relatorio","Relatório"],["mural","Mural"]],
+  usuario=null, onTrocarUsuario=null}) {
   const logo = typeof window !== "undefined" ? window.LOGO : null;
   const [isMobile, setIsMobile] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -107,12 +108,23 @@ export function Header({tab, setTab, onSair, titulo="Restaurante", eyebrow="Seme
           {isMobile
             ? <button onClick={()=>setMenuAberto(true)} aria-label="Abrir menu" title="Abrir menu"
                 style={{marginLeft:"auto",background:C.sage,color:C.brand,border:"1px solid "+C.line,borderRadius:8,padding:"8px 12px",fontSize:18,lineHeight:1,cursor:"pointer"}}>☰</button>
-            : (onSair && (
-                <button onClick={onSair} title="Voltar à central de aplicativos"
-                  style={{marginLeft:"auto",background:C.sage,color:C.brand,border:"1px solid "+C.line,borderRadius:8,padding:"8px 13px",fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
-                  <span aria-hidden>←</span> Módulos
-                </button>
-              ))}
+            : (
+                <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:12}}>
+                  {usuario && (
+                    <span style={{fontSize:13,color:C.muted,display:"inline-flex",alignItems:"center",gap:7}}>
+                      <span aria-hidden>👤</span><b style={{color:C.ink}}>{usuario}</b>
+                      {onTrocarUsuario && <button onClick={onTrocarUsuario} title="Trocar usuário"
+                        style={{background:"transparent",border:"1px solid "+C.line,color:C.brand,borderRadius:7,padding:"4px 9px",fontSize:12,cursor:"pointer"}}>trocar</button>}
+                    </span>
+                  )}
+                  {onSair && (
+                    <button onClick={onSair} title="Voltar à central de aplicativos"
+                      style={{background:C.sage,color:C.brand,border:"1px solid "+C.line,borderRadius:8,padding:"8px 13px",fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
+                      <span aria-hidden>←</span> Módulos
+                    </button>
+                  )}
+                </div>
+              )}
         </div>
         {!isMobile && (
           <nav style={{display:"flex",gap:2,flexWrap:"wrap"}}>
@@ -144,6 +156,13 @@ export function Header({tab, setTab, onSair, titulo="Restaurante", eyebrow="Seme
             <button onClick={()=>setMenuAberto(false)} aria-label="Fechar menu"
               style={{background:"transparent",border:"none",color:C.muted,fontSize:22,lineHeight:1,cursor:"pointer",padding:"0 4px"}}>&times;</button>
           </div>
+          {usuario && (
+            <div style={{padding:"2px 12px 12px",marginBottom:6,borderBottom:"1px solid "+C.line}}>
+              <div style={{fontSize:14,color:C.ink}}><span aria-hidden>👤</span> <b>{usuario}</b></div>
+              {onTrocarUsuario && <button onClick={()=>{ setMenuAberto(false); onTrocarUsuario(); }}
+                style={{marginTop:8,background:"transparent",border:"1px solid "+C.line,color:C.brand,borderRadius:8,padding:"7px 12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Trocar usuário</button>}
+            </div>
+          )}
           {tabs.map(([id,label])=>{
             const a = tab===id;
             return (

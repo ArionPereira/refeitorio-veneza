@@ -12,6 +12,9 @@ const RENDERIZADORES = {
   pcm:         (props) => <PCM {...props} />,
 };
 
+// Módulos que têm login próprio e dispensam o nome global do hub.
+const SEM_NOME_GLOBAL = { pcm: true };
+
 export function App() {
   const [modulo,    setModulo]    = useState(null);
   const [nome,      setNome]      = useState(localStorage.getItem("refeitorio_nome") || "");
@@ -20,7 +23,7 @@ export function App() {
   // Escolha de módulo no hub → pede nome se ainda não tiver, depois entra.
   const escolher = (id) => {
     setModulo(id);
-    if (!nome) setPedirNome(true);
+    if (!SEM_NOME_GLOBAL[id] && !nome) setPedirNome(true);
   };
 
   const confirmarNome = (v) => {
@@ -35,7 +38,8 @@ export function App() {
   if (!modulo) return <Hub onSelect={escolher} nome={nome} />;
 
   // Pede o nome antes de acessar o módulo (sem senha, inicialmente).
-  if (pedirNome || !nome) {
+  // Módulos com login próprio (ex.: PCM) pulam esse passo.
+  if (!SEM_NOME_GLOBAL[modulo] && (pedirNome || !nome)) {
     return <ModalNome onOk={confirmarNome} onVoltar={voltarAoHub} />;
   }
 
