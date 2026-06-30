@@ -3,6 +3,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 import { C, SH, SERIF } from "../../constants.js";
 import { Header, Centro } from "../../ui.jsx";
 import { listSetores, listEquipamentos, listOrdens, assinarPCM } from "./pcmdb.js";
+import { Equipamentos } from "./Equipamentos.jsx";
 
 const TABS = [["ordens","Ordens"],["equipamentos","Equipamentos"]];
 
@@ -62,9 +63,7 @@ export function PCM({ nome, onSair }) {
           </EmBreve>
         )}
         {tab==="equipamentos" && (
-          <EmBreve titulo="Cadastro de equipamentos e ficha do ativo" etapa="2">
-            <span style={{fontSize:13,color:C.muted}}>{setores.length} setores · {equipamentos.length} equipamentos no banco.</span>
-          </EmBreve>
+          <Equipamentos setores={setores} equipamentos={equipamentos} recarregar={recarregar}/>
         )}
 
         <p style={{fontSize:12,color:C.muted,textAlign:"center",marginTop:20}}>
