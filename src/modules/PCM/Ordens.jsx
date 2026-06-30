@@ -184,6 +184,14 @@ export function OSDetalhe({ os, equip, setor, usuario, usuarios, recarregar, onF
   };
   const tirarFoto = async (id) => { if (window.confirm("Remover esta foto?")) { await removeFoto(id); await carregarFotos(); } };
 
+  const imprimir = () => {
+    document.body.classList.add("pcm-printing");
+    const limpar = () => { document.body.classList.remove("pcm-printing"); window.removeEventListener("afterprint", limpar); };
+    window.addEventListener("afterprint", limpar);
+    window.print();
+    setTimeout(limpar, 1500);
+  };
+
   const inpD = { border:"1px solid "+C.line, borderRadius:8, padding:"9px 11px", fontSize:14, background:C.paper, color:C.ink, width:"100%" };
   const leadMs = difMs(os.aberta_em, os.concluida_em);   // lead time (abertura → conclusão)
   const execMs = difMs(os.iniciada_em, os.concluida_em); // tempo em execução (início → conclusão)
@@ -332,8 +340,46 @@ export function OSDetalhe({ os, equip, setor, usuario, usuarios, recarregar, onF
           )}
         </div>
 
-        <div style={{marginTop:16}}>
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button onClick={imprimir} style={{background:C.sage,color:C.brand,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}><span aria-hidden>🖨</span> Imprimir</button>
           <button onClick={onFechar} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 16px",fontSize:13,cursor:"pointer"}}>Fechar</button>
+        </div>
+
+        {/* Layout de impressão (A4) — escondido na tela, visível só ao imprimir */}
+        <div className="pcm-os-print" style={{fontFamily:"Georgia,serif",fontSize:12,lineHeight:1.5}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2px solid #000",paddingBottom:8,marginBottom:12}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:700}}>Ordem de Serviço Nº {os.numero||"—"}</div>
+              <div style={{fontSize:12}}>Sementes Veneza · PCM — Manutenção</div>
+            </div>
+            <div style={{textAlign:"right",fontSize:12}}>
+              <div>{tipoLabel(os.tipo)} · Prioridade {prioLabel(os.prioridade||"media")}</div>
+              <div>Status: <b>{statusLabel(os.status)}</b></div>
+            </div>
+          </div>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>{os.titulo}</div>
+          {os.descricao && <div style={{marginBottom:10,whiteSpace:"pre-wrap"}}>{os.descricao}</div>}
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:12}}>
+            <tbody>
+              <tr><td style={{padding:"3px 0",width:"50%"}}><b>Equipamento:</b> {equip?equip.tag+" · "+equip.nome:"—"}</td><td style={{padding:"3px 0"}}><b>Setor:</b> {setor?setor.nome:"—"}</td></tr>
+              <tr><td style={{padding:"3px 0"}}><b>Aberta por:</b> {nomeUsuario(os.aberta_por_id,usuarios)||os.solicitante||"—"}</td><td style={{padding:"3px 0"}}><b>Executante:</b> {nomeUsuario(os.executante_id,usuarios)||"—"}</td></tr>
+              <tr><td style={{padding:"3px 0"}}><b>Abertura:</b> {fmtDataHora(os.aberta_em)}</td><td style={{padding:"3px 0"}}><b>Prevista:</b> {fmtDataBR(os.planejada_para)}</td></tr>
+              <tr><td style={{padding:"3px 0"}}><b>Início:</b> {fmtDataHora(os.iniciada_em)}</td><td style={{padding:"3px 0"}}><b>Conclusão:</b> {fmtDataHora(os.concluida_em)}</td></tr>
+              <tr><td style={{padding:"3px 0"}}><b>Lead time:</b> {fmtDuracao(leadMs)}</td><td style={{padding:"3px 0"}}><b>Em execução:</b> {fmtDuracao(execMs)}</td></tr>
+              <tr><td style={{padding:"3px 0"}}><b>Máquina parada:</b> {os.tempo_parada_min!=null?os.tempo_parada_min+" min":"—"}</td><td style={{padding:"3px 0"}}></td></tr>
+            </tbody>
+          </table>
+          {os.status==="concluida" && (
+            <div style={{borderTop:"1px solid #000",paddingTop:8}}>
+              <div><b>Causa raiz:</b> {os.causa_raiz}</div>
+              <div><b>Solução aplicada:</b> {os.solucao}</div>
+            </div>
+          )}
+          {os.status==="cancelada" && <div style={{borderTop:"1px solid #000",paddingTop:8}}><b>Motivo do cancelamento:</b> {os.motivo_cancelamento}</div>}
+          <div style={{marginTop:28,display:"flex",justifyContent:"space-between"}}>
+            <div style={{borderTop:"1px solid #000",paddingTop:4,width:"42%",textAlign:"center",fontSize:11}}>Executante</div>
+            <div style={{borderTop:"1px solid #000",paddingTop:4,width:"42%",textAlign:"center",fontSize:11}}>Supervisor</div>
+          </div>
         </div>
       </div>
     </div>

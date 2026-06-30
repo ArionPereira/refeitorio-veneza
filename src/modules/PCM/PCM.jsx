@@ -6,8 +6,9 @@ import { listUsuarios, listSetores, listEquipamentos, listOrdens, assinarPCM } f
 import { SelecaoUsuario } from "./Usuarios.jsx";
 import { Equipamentos } from "./Equipamentos.jsx";
 import { Ordens } from "./Ordens.jsx";
+import { Relatorios } from "./Relatorios.jsx";
 
-const TABS = [["ordens","Ordens"],["equipamentos","Equipamentos"]];
+const TABS = [["ordens","Ordens"],["equipamentos","Equipamentos"],["relatorios","Relatórios"]];
 const CHAVE_USUARIO = "pcm_usuario_id";
 
 export function PCM({ onSair }) {
@@ -62,6 +63,9 @@ export function PCM({ onSair }) {
         )}
         {tab==="equipamentos" && (
           <Equipamentos setores={setores} equipamentos={equipamentos} ordens={ordens} usuario={usuario} usuarios={usuarios} recarregar={recarregar}/>
+        )}
+        {tab==="relatorios" && (
+          <Relatorios ordens={ordens} equipamentos={equipamentos} setores={setores} usuarios={usuarios}/>
         )}
 
         <p style={{fontSize:12,color:C.muted,textAlign:"center",marginTop:24}}>

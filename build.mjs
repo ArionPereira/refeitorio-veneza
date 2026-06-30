@@ -34,11 +34,16 @@ const CSS = `
   @media (max-width:640px){
     main{padding-left:12px!important;padding-right:12px!important}
   }
+  .pcm-os-print{display:none}
   @media print{
     .no-print{display:none!important}
     body{background:#fff!important}
     main{padding:0!important;max-width:100%!important}
     @page{margin:12mm}
+    /* PCM: imprimir só a OS quando o body tem a classe pcm-printing */
+    body.pcm-printing *{visibility:hidden}
+    body.pcm-printing .pcm-os-print, body.pcm-printing .pcm-os-print *{visibility:visible}
+    body.pcm-printing .pcm-os-print{display:block;position:absolute;left:0;top:0;width:100%;padding:0;color:#000}
   }
 `;
 
