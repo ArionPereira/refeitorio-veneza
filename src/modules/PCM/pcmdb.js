@@ -41,12 +41,13 @@ export const fecharOrdem = (id, { causa_raiz, solucao, tempo_parada_min, executa
 export const cancelarOrdem = (id, motivo_cancelamento) =>
   updateOrdem(id, { status:"cancelada", motivo_cancelamento });
 
-// muda o status, carimbando datas conforme o passo
-export const mudarStatus = (id, status, extra={}) => {
-  const patch = { status, ...extra };
-  if (status === "executando" && !("iniciada_em" in patch)) patch.iniciada_em = new Date().toISOString();
-  return updateOrdem(id, patch);
-};
+// muda o status; quem carimba datas (iniciada_em na 1ª vez, limpar
+// concluida_em ao reabrir) é o chamador, que conhece a OS atual.
+export const mudarStatus = (id, status, extra={}) => updateOrdem(id, { status, ...extra });
+
+// ---- Histórico de mudanças de status (timeline) ----
+export const listHistorico      = (osId) => ok(sb.from("pcm_os_status_historico").select("*").eq("os_id", osId).order("em"));
+export const registrarHistorico = (obj)  => ok(sb.from("pcm_os_status_historico").insert(obj).select().single());
 
 // ---- Fotos da OS ----
 export const listFotos = (osId) => ok(sb.from("pcm_os_fotos").select("*").eq("os_id", osId).order("criado_em"));
@@ -65,7 +66,7 @@ export async function uploadFoto(file, prefixo="os") {
 // ---- Realtime: avisa quando qualquer tabela pcm_ muda ----
 export function assinarPCM(onChange) {
   const ch = sb.channel("pcm-realtime");
-  ["pcm_usuarios","pcm_setores","pcm_equipamentos","pcm_ordens","pcm_os_fotos"].forEach(t=>{
+  ["pcm_usuarios","pcm_setores","pcm_equipamentos","pcm_ordens","pcm_os_fotos","pcm_os_status_historico"].forEach(t=>{
     ch.on("postgres_changes", { event:"*", schema:"public", table:t }, (payload)=>onChange(t, payload));
   });
   ch.subscribe();

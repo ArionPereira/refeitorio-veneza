@@ -1,8 +1,13 @@
 import React from "react";
 const { useState, useEffect, useCallback } = React;
 import { C, SH, SH2, SERIF } from "../../constants.js";
-import { STATUS, FLUXO, TIPOS, FOTO_TIPOS, statusLabel, statusCor, tipoLabel, tipoCor, critCor } from "./pcmconst.js";
-import { addOrdem, mudarStatus, fecharOrdem, cancelarOrdem, listFotos, addFoto, removeFoto, uploadFoto } from "./pcmdb.js";
+import { STATUS, TIPOS, FOTO_TIPOS, ORDEM_STATUS, statusLabel, statusCor, tipoLabel, tipoCor, critCor, fmtDataHora } from "./pcmconst.js";
+import { addOrdem, mudarStatus, fecharOrdem, cancelarOrdem, listFotos, addFoto, removeFoto, uploadFoto, listHistorico, registrarHistorico } from "./pcmdb.js";
+
+// reversão = sair de terminal (concluída/cancelada) ou voltar no fluxo principal
+const ehReversao = (de, para) =>
+  (de==="concluida" || de==="cancelada") ||
+  (ORDEM_STATUS[para]!=null && ORDEM_STATUS[de]!=null && ORDEM_STATUS[para] < ORDEM_STATUS[de]);
 
 const fotoLabel = (id) => (FOTO_TIPOS.find(t=>t.id===id)||{}).label || id;
 // nome do usuário pela FK, caindo no texto legado (solicitante) p/ OS antigas
@@ -94,37 +99,58 @@ export function FormOS({ setores, equipamentos, usuario, equipPre, onFechar, onS
 export function OSDetalhe({ os, equip, setor, usuario, usuarios, recarregar, onFechar }) {
   const [fotos,    setFotos]    = useState([]);
   const [modo,     setModo]     = useState(null); // null | "concluir" | "cancelar"
-  const [causa,    setCausa]    = useState("");
-  const [solucao,  setSolucao]  = useState("");
-  const [tempo,    setTempo]    = useState("");
-  const [motivo,   setMotivo]   = useState("");
+  // prefill com o que já houver (preservado ao reabrir uma OS concluída)
+  const [causa,    setCausa]    = useState(os.causa_raiz || "");
+  const [solucao,  setSolucao]  = useState(os.solucao || "");
+  const [tempo,    setTempo]    = useState(os.tempo_parada_min!=null ? String(os.tempo_parada_min) : "");
+  const [motivo,   setMotivo]   = useState(os.motivo_cancelamento || "");
   const [fotoTipo, setFotoTipo] = useState("problema");
   const [enviando, setEnviando] = useState(false);
   const [busy,     setBusy]     = useState(false);
   const [erro,     setErro]     = useState("");
 
+  const [historico, setHistorico] = useState([]);
   const carregarFotos = useCallback(async ()=>{ try { setFotos(await listFotos(os.id)); } catch(e){} }, [os.id]);
-  useEffect(()=>{ carregarFotos(); }, [carregarFotos]);
+  const carregarHist  = useCallback(async ()=>{ try { setHistorico(await listHistorico(os.id)); } catch(e){} }, [os.id]);
+  useEffect(()=>{ carregarFotos(); carregarHist(); }, [carregarFotos, carregarHist]);
 
-  const terminal    = ehTerminal(os.status);
-  const proximos    = (FLUXO[os.status]||[]).filter(s=>!ehTerminal(s));
-  const podeConcluir= (FLUXO[os.status]||[]).includes("concluida");
-  const podeCancelar= (FLUXO[os.status]||[]).includes("cancelada");
+  const registrar = (de, para) => registrarHistorico({ os_id:os.id, de_status:de, para_status:para, usuario_id:usuario?.id||null, usuario_nome:usuario?.nome||null });
 
-  const avancar = async (novo) => { setErro(""); try { await mudarStatus(os.id, novo); await recarregar(); } catch(err){ setErro(String(err.message||err)); } };
+  // mover para um status NÃO-terminal (concluir/cancelar têm forma própria)
+  const mover = async (para) => {
+    if (para === os.status) return;
+    if (ehReversao(os.status, para)) {
+      const msg = os.status==="concluida"
+        ? "Reabrir esta OS? A conclusão será desfeita (causa raiz, solução e tempo são preservados para o próximo fechamento)."
+        : os.status==="cancelada"
+          ? "Reativar esta OS cancelada?"
+          : 'Voltar a OS para "'+statusLabel(para)+'"? Tem certeza?';
+      if (!window.confirm(msg)) return;
+    }
+    const extra = {};
+    if (para==="executando" && !os.iniciada_em) extra.iniciada_em = new Date().toISOString();
+    if (os.status==="concluida" && para!=="concluida") extra.concluida_em = null; // reabrir: limpa data, preserva causa/solução/tempo
+    setErro("");
+    try { await mudarStatus(os.id, para, extra); await registrar(os.status, para); await recarregar(); await carregarHist(); }
+    catch(err){ setErro(String(err.message||err)); }
+  };
 
   const concluir = async () => {
     if (!causa.trim() || !solucao.trim() || tempo==="") { setErro("Causa raiz, solução e tempo de parada são obrigatórios."); return; }
     setErro(""); setBusy(true);
-    try { await fecharOrdem(os.id, { causa_raiz:causa.trim(), solucao:solucao.trim(), tempo_parada_min:parseInt(tempo)||0, executante_id:usuario?.id }); await recarregar(); onFechar(); }
+    try { const de=os.status; await fecharOrdem(os.id, { causa_raiz:causa.trim(), solucao:solucao.trim(), tempo_parada_min:parseInt(tempo)||0, executante_id:usuario?.id }); await registrar(de,"concluida"); await recarregar(); onFechar(); }
     catch(err){ setErro(String(err.message||err)); setBusy(false); }
   };
   const cancelar = async () => {
     if (!motivo.trim()) { setErro("Informe o motivo do cancelamento."); return; }
     setErro(""); setBusy(true);
-    try { await cancelarOrdem(os.id, motivo.trim()); await recarregar(); onFechar(); }
+    try { const de=os.status; await cancelarOrdem(os.id, motivo.trim()); await registrar(de,"cancelada"); await recarregar(); onFechar(); }
     catch(err){ setErro(String(err.message||err)); setBusy(false); }
   };
+
+  // linha da timeline: abertura (sintética) + cada mudança registrada
+  const linhaAbertura = { para_status:"aberta", usuario_nome: nomeUsuario(os.aberta_por_id, usuarios) || os.solicitante || null, em: os.aberta_em };
+  const timeline = [linhaAbertura, ...historico];
   const subirFoto = async (e) => {
     const f = e.target.files && e.target.files[0]; if(!f) return;
     setErro(""); setEnviando(true);
@@ -198,49 +224,71 @@ export function OSDetalhe({ os, equip, setor, usuario, usuarios, recarregar, onF
           )}
         </div>
 
+        {/* Timeline */}
+        <div style={{borderTop:"1px solid "+C.line,marginTop:16,paddingTop:12}}>
+          <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8}}>Histórico de status</div>
+          <div style={{display:"flex",flexDirection:"column",gap:0}}>
+            {timeline.map((h,i)=>(
+              <div key={h.id||("ab"+i)} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",flex:"0 0 auto"}}>
+                  <span style={{width:10,height:10,borderRadius:"50%",background:statusCor(h.para_status),marginTop:3}}/>
+                  {i<timeline.length-1 && <span style={{width:2,flex:1,minHeight:18,background:C.line}}/>}
+                </div>
+                <div style={{paddingBottom:i<timeline.length-1?10:0}}>
+                  <div style={{fontSize:13,color:C.ink}}>
+                    {h.de_status ? <><span style={{color:C.muted}}>{statusLabel(h.de_status)} →</span> </> : null}
+                    <b style={{color:statusCor(h.para_status)}}>{statusLabel(h.para_status)}</b>
+                  </div>
+                  <div style={{fontSize:11.5,color:C.muted}}>{fmtDataHora(h.em)}{h.usuario_nome?" · "+h.usuario_nome:""}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {erro && <div style={{marginTop:12,fontSize:13,color:C.clay,background:"#FBEAE3",border:"1px solid "+C.clay,borderRadius:8,padding:"8px 10px"}}>{erro}</div>}
 
         {/* Ações */}
-        {!terminal && (
-          <div style={{borderTop:"1px solid "+C.line,marginTop:14,paddingTop:14}}>
-            {modo==="concluir" ? (
-              <>
-                <div style={{fontSize:13,fontWeight:700,color:C.brand,marginBottom:2}}>Concluir OS</div>
-                <div style={lab}>Causa raiz *</div>
-                <textarea value={causa} onChange={e=>setCausa(e.target.value)} rows={2} placeholder="Por que aconteceu" style={{...inpD,resize:"vertical"}}/>
-                <div style={lab}>Solução aplicada *</div>
-                <textarea value={solucao} onChange={e=>setSolucao(e.target.value)} rows={2} placeholder="O que foi feito" style={{...inpD,resize:"vertical"}}/>
-                <div style={lab}>Tempo de máquina parada (min) *</div>
-                <input type="number" min="0" value={tempo} onChange={e=>setTempo(e.target.value)} style={{...inpD,width:140}}/>
-                <div style={{display:"flex",gap:10,marginTop:14}}>
-                  <button onClick={concluir} disabled={busy} style={{background:C.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13.5,fontWeight:600,cursor:busy?"default":"pointer"}}>{busy?"concluindo…":"Confirmar conclusão"}</button>
-                  <button onClick={()=>{ setModo(null); setErro(""); }} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>Voltar</button>
-                </div>
-              </>
-            ) : modo==="cancelar" ? (
-              <>
-                <div style={{fontSize:13,fontWeight:700,color:C.clay,marginBottom:2}}>Cancelar OS</div>
-                <div style={lab}>Motivo do cancelamento *</div>
-                <textarea value={motivo} onChange={e=>setMotivo(e.target.value)} rows={2} placeholder="Por que está sendo cancelada" style={{...inpD,resize:"vertical"}}/>
-                <div style={{display:"flex",gap:10,marginTop:14}}>
-                  <button onClick={cancelar} disabled={busy} style={{background:C.clay,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13.5,fontWeight:600,cursor:busy?"default":"pointer"}}>{busy?"cancelando…":"Confirmar cancelamento"}</button>
-                  <button onClick={()=>{ setModo(null); setErro(""); }} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>Voltar</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8}}>Avançar status</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {proximos.map(s=>(
-                    <button key={s} onClick={()=>avancar(s)} style={{background:statusCor(s),color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>→ {statusLabel(s)}</button>
-                  ))}
-                  {podeConcluir && <button onClick={()=>{ setModo("concluir"); setErro(""); }} style={{background:C.green,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>✓ Concluir OS</button>}
-                  {podeCancelar && <button onClick={()=>{ setModo("cancelar"); setErro(""); }} style={{background:"transparent",color:C.clay,border:"1px solid "+C.clay,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancelar OS</button>}
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <div style={{borderTop:"1px solid "+C.line,marginTop:14,paddingTop:14}}>
+          {modo==="concluir" ? (
+            <>
+              <div style={{fontSize:13,fontWeight:700,color:C.brand,marginBottom:2}}>Concluir OS</div>
+              <div style={lab}>Causa raiz *</div>
+              <textarea value={causa} onChange={e=>setCausa(e.target.value)} rows={2} placeholder="Por que aconteceu" style={{...inpD,resize:"vertical"}}/>
+              <div style={lab}>Solução aplicada *</div>
+              <textarea value={solucao} onChange={e=>setSolucao(e.target.value)} rows={2} placeholder="O que foi feito" style={{...inpD,resize:"vertical"}}/>
+              <div style={lab}>Tempo de máquina parada (min) *</div>
+              <input type="number" min="0" value={tempo} onChange={e=>setTempo(e.target.value)} style={{...inpD,width:140}}/>
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                <button onClick={concluir} disabled={busy} style={{background:C.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13.5,fontWeight:600,cursor:busy?"default":"pointer"}}>{busy?"concluindo…":"Confirmar conclusão"}</button>
+                <button onClick={()=>{ setModo(null); setErro(""); }} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>Voltar</button>
+              </div>
+            </>
+          ) : modo==="cancelar" ? (
+            <>
+              <div style={{fontSize:13,fontWeight:700,color:C.clay,marginBottom:2}}>Cancelar OS</div>
+              <div style={lab}>Motivo do cancelamento *</div>
+              <textarea value={motivo} onChange={e=>setMotivo(e.target.value)} rows={2} placeholder="Por que está sendo cancelada" style={{...inpD,resize:"vertical"}}/>
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                <button onClick={cancelar} disabled={busy} style={{background:C.clay,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13.5,fontWeight:600,cursor:busy?"default":"pointer"}}>{busy?"cancelando…":"Confirmar cancelamento"}</button>
+                <button onClick={()=>{ setModo(null); setErro(""); }} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,cursor:"pointer"}}>Voltar</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{fontSize:12,color:C.muted,fontWeight:600,marginBottom:8}}>Mover para</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {STATUS.filter(s=>s.id!==os.status).map(s=>{
+                  if (s.id==="concluida") return <button key="concluir" onClick={()=>{ setModo("concluir"); setErro(""); }} style={{background:C.green,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>✓ Concluir</button>;
+                  if (s.id==="cancelada") return <button key="cancelar" onClick={()=>{ setModo("cancelar"); setErro(""); }} style={{background:"transparent",color:C.clay,border:"1px solid "+C.clay,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>✕ Cancelar</button>;
+                  const rev = ehReversao(os.status, s.id);
+                  return <button key={s.id} onClick={()=>mover(s.id)} title={rev?"Reverter status":"Avançar status"}
+                    style={{background:rev?"transparent":s.cor,color:rev?s.cor:"#fff",border:rev?"1px solid "+s.cor:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>{rev?"↩":"→"} {s.label}</button>;
+                })}
+              </div>
+            </>
+          )}
+        </div>
 
         <div style={{marginTop:16}}>
           <button onClick={onFechar} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 16px",fontSize:13,cursor:"pointer"}}>Fechar</button>

@@ -43,6 +43,16 @@ export const FOTO_TIPOS = [
   { id:"outro",      label:"Outro" },
 ];
 
+// ordem do fluxo principal (p/ detectar reversão; cancelada é à parte)
+export const ORDEM_STATUS = { aberta:0, planejada:1, executando:2, aguardando_peca:3, concluida:4 };
+
+// data/hora em padrão BR: dd/mm/aaaa hh:mm
+export const fmtDataHora = (iso) => {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
+  catch(e){ return ""; }
+};
+
 // helpers de rótulo/cor
 const acha = (arr,id) => arr.find(x=>x.id===id) || {};
 export const statusLabel = (id) => acha(STATUS,id).label || id;
