@@ -2,7 +2,7 @@ import React from "react";
 const { useState, useEffect, useCallback } = React;
 import { C, SH, SH2, SERIF } from "../../constants.js";
 import { STATUS, TIPOS, FOTO_TIPOS, PRIORIDADES, ORDEM_STATUS, statusLabel, statusCor, tipoLabel, tipoCor, prioLabel, prioCor, critCor, fmtDataHora, fmtDataBR, fmtDuracao, difMs } from "./pcmconst.js";
-import { addOrdem, mudarStatus, fecharOrdem, cancelarOrdem, listFotos, addFoto, removeFoto, uploadFoto, listHistorico, registrarHistorico } from "./pcmdb.js";
+import { addOrdem, mudarStatus, fecharOrdem, cancelarOrdem, removeOrdem, listFotos, addFoto, removeFoto, uploadFoto, listHistorico, registrarHistorico } from "./pcmdb.js";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 
 // reversão = sair de terminal (concluída/cancelada) ou voltar no fluxo principal
@@ -143,7 +143,8 @@ export function FormOS({ setores, equipamentos, componentes, usuario, equipPre, 
 // Detalhe da OS: avançar status, concluir (causa raiz/solução/tempo),
 // cancelar (motivo) e fotos.
 // ---------------------------------------------------------------------------
-export function OSDetalhe({ os, equip, setor, usuario, usuarios, componentes, recarregar, onFechar, modoInicial=null }) {
+export function OSDetalhe({ os, equip, setor, usuario, usuarios, componentes, sessao, recarregar, onFechar, modoInicial=null }) {
+  const eMaster = sessao?.role === "master";
   const [fotos,    setFotos]    = useState([]);
   const [modo,     setModo]     = useState(modoInicial); // null | "concluir" | "cancelar"
   // prefill com o que já houver (preservado ao reabrir uma OS concluída)
@@ -196,6 +197,13 @@ export function OSDetalhe({ os, equip, setor, usuario, usuarios, componentes, re
     setEnviando(false); if (e.target) e.target.value = "";
   };
   const tirarFoto = async (id) => { if (window.confirm("Remover esta foto?")) { await removeFoto(id); await carregarFotos(); } };
+
+  const apagarOS = async () => {
+    if (!window.confirm("Apagar a OS "+(os.numero||"")+" DEFINITIVAMENTE?\n\nA OS some do quadro, dos relatórios e do histórico do equipamento. O histórico de status e as fotos vão junto. Não dá pra desfazer.")) return;
+    setErro(""); setBusy(true);
+    try { await removeOrdem(os.id); await recarregar(); onFechar(); }
+    catch(err){ setErro(String(err.message||err)); setBusy(false); }
+  };
 
   const imprimir = () => {
     document.body.classList.add("pcm-printing");
@@ -354,9 +362,11 @@ export function OSDetalhe({ os, equip, setor, usuario, usuarios, componentes, re
           )}
         </div>
 
-        <div style={{display:"flex",gap:10,marginTop:16}}>
+        <div style={{display:"flex",gap:10,marginTop:16,alignItems:"center",flexWrap:"wrap"}}>
           <button onClick={imprimir} style={{background:C.sage,color:C.brand,border:"1px solid "+C.line,borderRadius:8,padding:"9px 14px",fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}><span aria-hidden>🖨</span> Imprimir</button>
           <button onClick={onFechar} style={{background:"transparent",color:C.muted,border:"1px solid "+C.line,borderRadius:8,padding:"9px 16px",fontSize:13,cursor:"pointer"}}>Fechar</button>
+          {eMaster && <button onClick={apagarOS} disabled={busy} title="Apagar a OS definitivamente (só master)"
+            style={{marginLeft:"auto",background:C.clay,color:"#fff",border:"none",borderRadius:8,padding:"9px 14px",fontSize:13,fontWeight:600,cursor:busy?"default":"pointer",display:"inline-flex",alignItems:"center",gap:6}}><span aria-hidden>🗑</span> Apagar OS</button>}
         </div>
 
         {/* Layout de impressão (A4) — escondido na tela, visível só ao imprimir */}
@@ -425,7 +435,7 @@ function CartaoArrastavel({ id, onClick, children }) {
 // ---------------------------------------------------------------------------
 // Ordens (exportado) — board Kanban com drag-and-drop
 // ---------------------------------------------------------------------------
-export function Ordens({ setores, equipamentos, componentes, ordens, usuario, usuarios, recarregar }) {
+export function Ordens({ setores, equipamentos, componentes, ordens, usuario, usuarios, sessao, recarregar }) {
   const [form,  setForm]  = useState(false);
   const [selId, setSelId] = useState(null);
 
@@ -509,6 +519,6 @@ export function Ordens({ setores, equipamentos, componentes, ordens, usuario, us
     </DndContext>
 
     {form && <FormOS setores={setores} equipamentos={equipamentos} componentes={componentes} usuario={usuario} onFechar={()=>setForm(false)} onSalvo={recarregar}/>}
-    {sel && <OSDetalhe key={sel.id} os={sel} equip={selEquip} setor={selEquip?setorMap[selEquip.setor_id]:null} usuario={usuario} usuarios={usuarios} componentes={componentes} recarregar={recarregar} modoInicial={modoDetalhe} onFechar={()=>{ setSelId(null); setModoDetalhe(null); }}/>}
+    {sel && <OSDetalhe key={sel.id} os={sel} equip={selEquip} setor={selEquip?setorMap[selEquip.setor_id]:null} usuario={usuario} usuarios={usuarios} componentes={componentes} sessao={sessao} recarregar={recarregar} modoInicial={modoDetalhe} onFechar={()=>{ setSelId(null); setModoDetalhe(null); }}/>}
   </>);
 }

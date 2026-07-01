@@ -11,7 +11,7 @@ import { Relatorios } from "./Relatorios.jsx";
 const TABS = [["ordens","Ordens"],["equipamentos","Equipamentos"],["relatorios","Relatórios"]];
 const CHAVE_USUARIO = "pcm_usuario_id";
 
-export function PCM({ onSair }) {
+export function PCM({ onSair, sessao }) {
   const [usuarios,     setUsuarios]     = useState([]);
   const [setores,      setSetores]      = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
@@ -60,7 +60,7 @@ export function PCM({ onSair }) {
 
       <main style={{maxWidth:1080,margin:"0 auto",padding:"0 20px"}}>
         {tab==="ordens" && (
-          <Ordens setores={setores} equipamentos={equipamentos} componentes={componentes} ordens={ordens} usuario={usuario} usuarios={usuarios} recarregar={recarregar}/>
+          <Ordens setores={setores} equipamentos={equipamentos} componentes={componentes} ordens={ordens} usuario={usuario} usuarios={usuarios} sessao={sessao} recarregar={recarregar}/>
         )}
         {tab==="equipamentos" && (
           <Equipamentos setores={setores} equipamentos={equipamentos} componentes={componentes} ordens={ordens} usuario={usuario} usuarios={usuarios} recarregar={recarregar}/>

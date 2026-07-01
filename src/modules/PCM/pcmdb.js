@@ -38,6 +38,8 @@ export const listOrdens        = ()        => ok(sb.from("pcm_ordens").select("*
 export const listOrdensDoEquip = (equipId) => ok(sb.from("pcm_ordens").select("*").eq("equipamento_id", equipId).order("aberta_em", { ascending:false }));
 export const addOrdem          = (obj)     => ok(sb.from("pcm_ordens").insert(obj).select().single());
 export const updateOrdem       = (id, patch)=> ok(sb.from("pcm_ordens").update(patch).eq("id", id).select().single());
+// apaga a OS de vez (histórico e fotos somem junto, por FK on delete cascade) — só master na UI
+export const removeOrdem       = (id)      => ok(sb.from("pcm_ordens").delete().eq("id", id));
 
 // fecha a OS (a trava de causa raiz/solução/tempo também existe no banco)
 export const fecharOrdem = (id, { causa_raiz, solucao, tempo_parada_min, executante_id }) =>
