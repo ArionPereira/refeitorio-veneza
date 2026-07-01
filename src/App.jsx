@@ -1,8 +1,8 @@
 import React from "react";
 const { useState } = React;
 
-import { ModalNome } from "./ui.jsx";
 import { Hub } from "./Hub.jsx";
+import { Login } from "./acesso.jsx";
 import { Restaurante } from "./modules/Restaurante.jsx";
 import { PCM } from "./modules/PCM/PCM.jsx";
 import { Pluviometria } from "./modules/operacionais/Pluviometria.jsx";
@@ -17,28 +17,28 @@ const RENDERIZADORES = {
   almoxarifado: props => <Almoxarifado {...props} />,
 };
 
-const SEM_NOME_GLOBAL = { pcm: true };
+const carregarSessao = () => {
+  try { return JSON.parse(localStorage.getItem("veneza_sessao") || "null"); }
+  catch { return null; }
+};
 
 export function App() {
+  const [sessao, setSessao] = useState(carregarSessao);
   const [modulo, setModulo] = useState(null);
-  const [nome, setNome] = useState(localStorage.getItem("refeitorio_nome") || "");
-  const [pedirNome, setPedirNome] = useState(false);
 
-  const escolher = id => {
-    setModulo(id);
-    if (!SEM_NOME_GLOBAL[id] && !nome) setPedirNome(true);
-  };
-  const confirmarNome = v => {
-    localStorage.setItem("refeitorio_nome", v);
-    setNome(v);
-    setPedirNome(false);
-  };
+  const entrar = (u) => { localStorage.setItem("veneza_sessao", JSON.stringify(u)); setSessao(u); };
+  const sair = () => { localStorage.removeItem("veneza_sessao"); setSessao(null); setModulo(null); };
   const voltarAoHub = () => setModulo(null);
 
-  if (!modulo) return <Hub onSelect={escolher} nome={nome} />;
-  if (!SEM_NOME_GLOBAL[modulo] && (pedirNome || !nome)) {
-    return <ModalNome onOk={confirmarNome} onVoltar={voltarAoHub} />;
+  if (!sessao) return <Login onEntrar={entrar} />;
+
+  const podeVer = (id) => sessao.role === "master" || (sessao.modulos || []).includes(id);
+
+  if (!modulo || !podeVer(modulo)) {
+    return <Hub sessao={sessao} onSelect={id => podeVer(id) && setModulo(id)} onSair={sair} podeVer={podeVer} />;
   }
   const render = RENDERIZADORES[modulo];
-  return render ? render({ nome, setNome, onSair: voltarAoHub }) : <Hub onSelect={escolher} nome={nome} />;
+  return render
+    ? render({ nome: sessao.nome, setNome: () => {}, onSair: voltarAoHub, sessao })
+    : <Hub sessao={sessao} onSelect={id => podeVer(id) && setModulo(id)} onSair={sair} podeVer={podeVer} />;
 }
