@@ -6,6 +6,12 @@ import { S, hoje, num, inserir, rpc, msgErro, csv, Campo, Tabela, Form, Erro, Av
 
 const TABELAS=["alm_itens","alm_movimentacoes","alm_inventarios","alm_inventario_itens","alm_categorias","alm_unidades"];
 
+function Modal({onFechar,children}){
+  return <div onClick={onFechar} style={{position:"fixed",inset:0,background:"rgba(28,42,54,.5)",zIndex:100,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"24px 16px",overflowY:"auto"}}>
+    <div onClick={e=>e.stopPropagation()} style={{...S.card,width:"100%",maxWidth:460}}>{children}</div>
+  </div>;
+}
+
 function LinhaContagem({registro,item,unidade,onSalvar,bloqueado}) {
   const [valor,setValor]=useState(String(registro.contagem_fisica??0)),[salvando,setSalvando]=useState(false);
   useEffect(()=>setValor(String(registro.contagem_fisica??0)),[registro.contagem_fisica]);
@@ -51,6 +57,11 @@ export function Almoxarifado({onSair,nome}) {
     el.reset();setInventarioId(id);await recarregar();
   }catch(e){setErro(msgErro(e))}};
   const salvarContagem=async(id,valor)=>{try{await rpc("alm_atualizar_contagem",{p_inventario_item_id:id,p_contagem:valor});await recarregar()}catch(e){setErro(msgErro(e))}};
+  const [editItem,setEditItem]=useState(null);
+  const salvarEditItem=async(f)=>{try{
+    await rpc("alm_atualizar_item",{p_id:editItem.id,p_nome:f.get("nome").trim(),p_categoria_id:f.get("categoria_id"),p_unidade_id:f.get("unidade_id"),p_estoque_minimo:Number(f.get("estoque_minimo")||0),p_ativo:f.get("ativo")==="on"});
+    setEditItem(null); await recarregar();
+  }catch(e){setErro(msgErro(e));setEditItem(null)}};
   const concluirInventario=async()=>{if(!inventarioSelecionado)return;if(!window.confirm("Concluir o inventário e ajustar o estoque pelas divergências?"))return;try{
     await rpc("alm_concluir_inventario",{p_inventario_id:inventarioSelecionado.id,p_responsavel:nome||inventarioSelecionado.responsavel||null});await recarregar();
   }catch(e){setErro(msgErro(e))}};
@@ -81,7 +92,8 @@ export function Almoxarifado({onSair,nome}) {
         <Campo label="Unidade de medida"><select name="unidade_id" required style={S.input}><option value="">Selecione</option>{unidades.filter(x=>x.ativo).map(x=><option key={x.id} value={x.id}>{x.nome} ({x.sigla})</option>)}</select></Campo>
         <Campo label="Estoque mínimo"><input name="estoque_minimo" type="number" min="0" step=".001" defaultValue="0" style={S.input}/></Campo>
       </Form>
-      <Titulo>Estoque atual</Titulo><Tabela rows={itens} cols={[["codigo","Código",x=><b>{x.codigo}</b>],["nome","Item"],["categoria","Categoria",x=>categoriaPorId[x.categoria_id]?.nome||x.categoria],["unidade","Unidade",x=>unidadeItem(x)],["saldo","Saldo",x=><b style={{color:saldo(x.id)<Number(x.estoque_minimo||0)?C.clay:C.ink}}>{num(saldo(x.id))} {unidadeItem(x)}</b>],["estoque_minimo","Mínimo",x=>num(x.estoque_minimo)+" "+unidadeItem(x)]]}/>
+      <Titulo>Estoque atual <span style={{fontSize:11,fontWeight:400,color:C.muted,textTransform:"none",letterSpacing:0}}>· clique numa linha para editar</span></Titulo>
+      <Tabela onRow={setEditItem} rows={itens} cols={[["codigo","Código",x=><b>{x.codigo}</b>],["nome","Item"],["categoria","Categoria",x=>categoriaPorId[x.categoria_id]?.nome||x.categoria],["unidade","Unidade",x=>unidadeItem(x)],["saldo","Saldo",x=><b style={{color:saldo(x.id)<Number(x.estoque_minimo||0)?C.clay:C.ink}}>{num(saldo(x.id))} {unidadeItem(x)}</b>],["estoque_minimo","Mínimo",x=>num(x.estoque_minimo)+" "+unidadeItem(x)],["ativo","Status",x=>x.ativo?"Ativo":"Inativo"]]}/>
     </>}
     {tab==="cadastros"&&<><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:18}}>
       <div><Titulo>Nova categoria</Titulo><Form onSubmit={addCategoria}><Campo label="Nome"><input name="nome" required style={S.input}/></Campo><Campo label="Tag do código"><input name="tag" required minLength="2" maxLength="8" placeholder="EPI" onInput={e=>e.currentTarget.value=e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g,"")} style={S.input}/></Campo></Form></div>
@@ -105,5 +117,19 @@ export function Almoxarifado({onSair,nome}) {
       <Titulo>Itens abaixo do mínimo</Titulo><Tabela rows={abaixo} cols={[["codigo","Código"],["nome","Item"],["saldo","Saldo",x=>num(saldo(x.id))+" "+unidadeItem(x)],["estoque_minimo","Mínimo",x=>num(x.estoque_minimo)+" "+unidadeItem(x)]]}/>
       <Titulo>Exportação</Titulo><button style={S.btn} onClick={()=>csv("estoque.csv",[["Código","Item","Categoria","Unidade","Saldo","Mínimo"],...itens.map(x=>[x.codigo,x.nome,categoriaPorId[x.categoria_id]?.nome||x.categoria,unidadeItem(x),saldo(x.id),x.estoque_minimo])])}>Baixar CSV</button>
     </>}
+    {editItem&&<Modal onFechar={()=>setEditItem(null)}>
+      <div style={{fontWeight:700,color:C.brand,marginBottom:10}}>Editar item · {editItem.codigo}</div>
+      <form onSubmit={e=>{e.preventDefault();salvarEditItem(new FormData(e.currentTarget))}} style={{display:"flex",flexDirection:"column",gap:12}}>
+        <Campo label="Nome do item"><input name="nome" required defaultValue={editItem.nome} style={S.input}/></Campo>
+        <Campo label="Categoria"><select name="categoria_id" required defaultValue={editItem.categoria_id} style={S.input}>{categorias.filter(x=>x.ativo||x.id===editItem.categoria_id).map(x=><option key={x.id} value={x.id}>{x.nome} ({x.tag})</option>)}</select></Campo>
+        <Campo label="Unidade de medida"><select name="unidade_id" required defaultValue={editItem.unidade_id} style={S.input}>{unidades.filter(x=>x.ativo||x.id===editItem.unidade_id).map(x=><option key={x.id} value={x.id}>{x.nome} ({x.sigla})</option>)}</select></Campo>
+        <Campo label="Estoque mínimo"><input name="estoque_minimo" type="number" min="0" step=".001" required defaultValue={editItem.estoque_minimo} style={S.input}/></Campo>
+        <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.ink}}><input type="checkbox" name="ativo" defaultChecked={editItem.ativo}/> Item ativo</label>
+        <div style={{display:"flex",gap:10,marginTop:4}}>
+          <button style={S.btn}>Salvar</button>
+          <button type="button" style={S.btn2} onClick={()=>setEditItem(null)}>Cancelar</button>
+        </div>
+      </form>
+    </Modal>}
   </Shell>;
 }
