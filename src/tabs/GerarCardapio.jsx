@@ -76,14 +76,18 @@ function escolherMelhor(cands, catMaxCusto, custoPrato, insumoMap, pessoas, esto
 // ordem fixa das categorias no plano de refeição
 const ORDEM_CAT = ["Proteína", "Base", "Guarnição", "Salada", "Sobremesa", "Bebida"];
 
-// Passada de segurança: garante que TODA refeição tenha 1 Proteína + TODAS as
-// Bases marcadas. Se o motor (ou a IA) esqueceu, preenchemos aqui.
-// Retorna { plano, avisos } — avisos lista o que foi adicionado.
+// Passada de segurança: garante que TODA refeição tenha o mínimo pedido de
+// cada categoria (1 Proteína, todas as Bases, N Guarnições, N Saladas,
+// 1 Sobremesa se pedida, 1 Bebida se pedida). Se o motor ou a IA esquecer,
+// preenchemos aqui. Retorna { plano, avisos } — avisos lista o que foi adicionado.
 function completarEstrutura({ plano, pratos, planoRef, refeicoes, pratoMap, insumoMap, custoPrato, pessoas, estoqueRest }) {
-  const bases = pratos.filter(p => p.categoria === "Base");
-  const proteinas = pratos.filter(p => p.categoria === "Proteína");
+  const porCat = {};
+  Object.keys(planoRef).forEach(cat => {
+    porCat[cat] = pratos.filter(p => p.categoria === cat);
+  });
+  // essas categorias são estruturais — se filtro de refeição zerar, relaxa
+  const ESTRUTURAIS = new Set(["Proteína", "Base"]);
   const avisos = [];
-  let custoAdicional = 0, adicionadas = 0, adicionadasCobertas = 0;
   const novoPlano = {};
   Object.keys(plano).forEach(data => {
     const dia = {};
@@ -98,46 +102,34 @@ function completarEstrutura({ plano, pratos, planoRef, refeicoes, pratoMap, insu
       ids.forEach(id => { const c = pratoMap[id]?.categoria; if (c) catCount[c] = (catCount[c] || 0) + 1; });
       const usadosAqui = new Set(ids);
 
-      // Garante 1 Proteína
-      if (planoRef["Proteína"] && (catCount["Proteína"] || 0) < 1 && proteinas.length) {
-        const eleg = proteinas.filter(p => serveRefeicao(p, refId) && !usadosAqui.has(p.id));
-        // se ninguém elegível pelo filtro de refeição, pega qualquer proteína (regra estrutural manda)
-        const cands = eleg.length ? eleg : proteinas.filter(p => !usadosAqui.has(p.id));
-        if (cands.length) {
-          // escolhe a mais barata como fallback determinístico
+      Object.keys(planoRef).forEach(cat => {
+        const cfg = planoRef[cat]; if (!cfg) return;
+        const disponiveis = porCat[cat] || [];
+        if (!disponiveis.length) return;
+        const alvo = cfg.qtd === "todas" ? disponiveis.length : Math.max(1, Number(cfg.qtd) || 1);
+        const atual = catCount[cat] || 0;
+        if (atual >= alvo) return;
+
+        for (let i = 0; i < alvo - atual; i++) {
+          let cands = disponiveis.filter(p => serveRefeicao(p, refId) && !usadosAqui.has(p.id));
+          // regra estrutural (Proteína/Base): relaxa filtro de refeição como último recurso
+          if (!cands.length && ESTRUTURAIS.has(cat)) {
+            cands = disponiveis.filter(p => !usadosAqui.has(p.id));
+          }
+          if (!cands.length) break;
           cands.sort((a, b) => custoPrato(a) - custoPrato(b));
           const escolha = cands[0];
           ids.push(escolha.id); usadosAqui.add(escolha.id);
-          adicionadas++;
-          const cob = cobertura(escolha, insumoMap, pessoas, estoqueRest);
-          if (cob >= 0.999) adicionadasCobertas++;
           consomeEstoque(escolha, insumoMap, pessoas, estoqueRest);
-          custoAdicional += custoPrato(escolha) * pessoas;
-          avisos.push(`${data} · ${ref.nome}: proteína faltando → adicionei ${escolha.nome}`);
+          avisos.push(`${data} · ${ref.nome}: ${cat.toLowerCase()} faltando → adicionei ${escolha.nome}`);
         }
-      }
-
-      // Garante todas as Bases (arroz/feijão sempre em toda refeição)
-      if (planoRef["Base"] && bases.length) {
-        bases.forEach(b => {
-          if (usadosAqui.has(b.id)) return;
-          // se a base tem marca "serve só em X" e X não é esta refeição, respeita a marca
-          if (!serveRefeicao(b, refId)) return;
-          ids.push(b.id); usadosAqui.add(b.id);
-          adicionadas++;
-          const cob = cobertura(b, insumoMap, pessoas, estoqueRest);
-          if (cob >= 0.999) adicionadasCobertas++;
-          consomeEstoque(b, insumoMap, pessoas, estoqueRest);
-          custoAdicional += custoPrato(b) * pessoas;
-          avisos.push(`${data} · ${ref.nome}: base faltando → adicionei ${b.nome}`);
-        });
-      }
+      });
 
       dia[refId] = { ...r, pratos: ids };
     });
     novoPlano[data] = dia;
   });
-  return { plano: novoPlano, avisos, delta: { custo: custoAdicional, adicionadas, adicionadasCobertas } };
+  return { plano: novoPlano, avisos };
 }
 
 export function gerarCardapioLocal({ pratos, custoPrato, insumoMap, pratoMap, estoque, cardapio, datas, refeicoes, planoRef, pessoas, opts }) {
